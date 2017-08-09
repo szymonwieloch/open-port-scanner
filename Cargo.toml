@@ -1,0 +1,10 @@
+[package]
+name = "ops"
+version = "0.1.0"
+authors = ["Szymon Wieloch <szymon.wieloch@gmail.com>"]
+
+[dependencies]
+opslib = { path = "opslib" }
+
+[workspace]
+members = ["opslib"]
