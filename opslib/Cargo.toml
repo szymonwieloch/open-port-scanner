@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["truenagual <true.nagual@gmail.com>"]
 
 [dependencies]
-ipnetwork = "0.5.0"
+ipnetwork = "0.12.6"
