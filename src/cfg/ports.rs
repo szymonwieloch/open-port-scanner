@@ -1,5 +1,4 @@
 use opslib::utils::{Range, simplify};
-use std::str::FromStr;
 
 ///Parses only single port value.
 fn parse_port(port: &str) -> Result<u16, String> {

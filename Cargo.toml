@@ -8,6 +8,8 @@ opslib = { path = "opslib" }
 clap = "2.26.0"
 log = "0.3.8"
 ipnetwork = "0.12.6"
+iprange = "0.4.1"
+ipnet = "1.0.0"
 
 [workspace]
 members = ["opslib"]

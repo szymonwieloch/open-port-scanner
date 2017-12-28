@@ -1,15 +1,16 @@
-use clap::{Arg, App, SubCommand};
-use opslib::utils::{Range, simplify};
-use std::net::{Ipv4Addr, Ipv6Addr};
+use clap::{Arg, App};
+use opslib::utils::{Range};
 use super::ports::{parse_ports, validate_ports};
-use super::ips::{parse_ip, validate_ip, IpRange};
+use super::ips::{parse_ip, validate_ip, IpRangeUniversal};
+use iprange::IpRange;
+use ipnet::{Ipv4Net, Ipv6Net};
 
 #[derive(Debug)]
 pub struct OpsConfig {
     tcp_ports: Vec<Range<u16>>,
     udp_ports: Vec<Range<u16>>,
-    ipv4: Vec<Range<Ipv4Addr>>,
-    ipv6: Vec<Range<Ipv6Addr>>,
+    ipv4: IpRange<Ipv4Net>,
+    ipv6: IpRange<Ipv6Net>,
     ping: bool,
     max_rate: Option<u32>,
     max_dev_rate: Option<u32>
@@ -20,7 +21,7 @@ const UDP_PORTS: &str = "udp-ports";
 const PING_ICMP: &str = "ping-icmp";
 const MAX_RATE: &str = "max-rate";
 const MAX_DEV_RATE: &str = "max-dev-rate";
-const IPS: & str = "ips";
+//const IPS: & str = "ips";
 const NONE: &str = "none";
 
 
@@ -71,19 +72,19 @@ pub fn parse_args() -> OpsConfig{
 
     //unwrap is now safe because of previous validation
     let ip_iter = matches.values_of("ips").unwrap().map(|t| parse_ip(t).unwrap());
-    let mut ipv4: Vec<Range<Ipv4Addr>> = Vec::new();
-    let mut ipv6: Vec<Range<Ipv6Addr>> = Vec::new();
+    let mut ipv4: IpRange<Ipv4Net> = IpRange::new();
+    let mut ipv6: IpRange<Ipv6Net> = IpRange::new();
     for range in ip_iter {
         match range {
-            IpRange::V4(r) => ipv4.push(r),
-            IpRange::V6(r) => ipv6.push(r),
+            IpRangeUniversal::V4(r) => ipv4 = ipv4.merge(&r),
+            IpRangeUniversal::V6(r) => ipv6 = ipv6.merge(&r),
         }
     }
     OpsConfig{
         tcp_ports: parse_ports(matches.value_of(TCP_PORTS).unwrap()).unwrap(), //safe because of validation
         udp_ports: parse_ports(matches.value_of(UDP_PORTS).unwrap()).unwrap(), //safe because of validation
-        ipv4: simplify(ipv4),
-        ipv6: simplify(ipv6),
+        ipv4: ipv4,
+        ipv6: ipv6,
         ping: matches.is_present(PING_ICMP),
         max_rate: if matches.value_of(MAX_RATE).unwrap() == NONE {
             None

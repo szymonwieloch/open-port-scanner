@@ -1,12 +1,11 @@
-use std::net::{Ipv4Addr, Ipv6Addr, IpAddr};
-use ipnetwork::{Ipv4Network, Ipv6Network, IpNetwork};
-use std::str::FromStr;
-use opslib::utils::{Range};
+use std::net::IpAddr;
+use ipnet::{IpNet, Ipv4Net, Ipv6Net, Ipv4Subnets, Ipv6Subnets};
+use iprange::IpRange;
+use std::iter::FromIterator;
 
-#[derive(Debug)]
-pub enum IpRange{
-    V4(Range<Ipv4Addr>),
-    V6(Range<Ipv6Addr>)
+pub enum IpRangeUniversal{
+    V4(IpRange<Ipv4Net>),
+    V6(IpRange<Ipv6Net>)
 }
 
 fn parse_single_ip(txt: &str) -> Result<IpAddr, String>{
@@ -16,7 +15,8 @@ fn parse_single_ip(txt: &str) -> Result<IpAddr, String>{
     }
 }
 
-pub fn parse_ip(txt: &str) -> Result<IpRange, String> {
+pub fn parse_ip(txt: &str) -> Result<IpRangeUniversal, String> {
+    //TODO: enable
     if let Some(idx) = txt.find("-") {
     //range
         let begin = &txt[0..idx];
@@ -29,35 +29,59 @@ pub fn parse_ip(txt: &str) -> Result<IpRange, String> {
         return match begin {
             IpAddr::V4(begin) =>{
                 match end {
-                    IpAddr::V4(end) => Ok(IpRange::V4(Range::new(begin, end))),
+                    IpAddr::V4(end) => Ok({
+                        let subnets = Ipv4Subnets::new(begin, end, 0);
+                        IpRangeUniversal::V4(IpRange::from_iter(subnets))
+                    }),
                     IpAddr::V6(end) => Err(format!("Mixed IP versions in range {}-{}", begin, end))
                 }
             },
             IpAddr::V6(begin) => {
                 match end {
                     IpAddr::V4(end) => Err(format!("Mixed IP versions in range {}-{}", begin, end)),
-                    IpAddr::V6(end) => Ok(IpRange::V6(Range::new(begin, end)))
+                    IpAddr::V6(end) => Ok({
+                        let subnets = Ipv6Subnets::new(begin, end, 0);
+                        IpRangeUniversal::V6(IpRange::from_iter(subnets))
+                    })
                 }
             }
         }
 
-    } else if let Some(_) = txt.find("/") {
+    } else  if let Some(_) = txt.find("/") {
     //network
-        let net:IpNetwork = match txt.parse() {
+        let net:IpNet = match txt.parse() {
             Ok(val) => val,
             Err(err) => return Err(format!("Could not parse IP network from {} because of {}", txt, err))
         };
         return match net{
-            IpNetwork::V4(val) => Ok(IpRange::V4(Range::new(val.ip(), val.broadcast()))),
-            IpNetwork::V6(val) => Ok(IpRange::V6(Range::new(val.ip(), ipv6_broadcast(&val))))
+            IpNet::V4(val) => Ok(IpRangeUniversal::V4({
+                let mut range = IpRange::new();
+                range.add(val);
+                range
+            })),
+            IpNet::V6(val) => Ok(IpRangeUniversal::V6({
+                let mut range = IpRange::new();
+                range.add(val);
+                range
+            }))
         }
 
     } else {
     //single IP
         let ip = parse_single_ip(txt)?;
-        return match ip{
-            IpAddr::V4(val) => Ok(IpRange::V4(Range::new(val, val))),
-            IpAddr::V6(val) => Ok(IpRange::V6(Range::new(val, val)))
+        return match ip {
+            IpAddr::V4(addr) => Ok(IpRangeUniversal::V4({
+                let net = Ipv4Net::new(addr, 32).unwrap();
+                let mut range = IpRange::new();
+                range.add(net);
+                range
+            })),
+            IpAddr::V6(addr) => Ok(IpRangeUniversal::V6({
+                let net = Ipv6Net::new(addr, 128).unwrap();
+                let mut range = IpRange::new();
+                range.add(net);
+                range
+            }))
         }
     }
 }
@@ -69,20 +93,10 @@ pub fn validate_ip(txt: String) -> Result<(), String> {
     }
 }
 
-//This functionality is not correctly implemented in ipnetwork
-//This could be done by a trait
-//TODO remove this once ipnetwork gets a better implementation
-fn ipv6_broadcast(net: &Ipv6Network) -> Ipv6Addr {
-    let mut segments = net.ip().segments();
-    for (i, segment) in net.mask().segments().iter().enumerate(){
-        segments[i] |= !*segment;
-    }
-    Ipv6Addr::from(segments)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::{IpAddr, Ipv4Addr};
 
     #[test]
     fn parse_single_ip_ok() {
@@ -95,21 +109,6 @@ mod tests {
     fn parse_single_ip_err() {
         let result = parse_single_ip("172.56.3c.7");
         let expected = Err(String::from("Could not parse IP from 172.56.3c.7 because of invalid IP address syntax"));
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn ipv6_broadcast_small() {
-        let net = "fe::/123".parse::<Ipv6Network>().unwrap();
-        let result = ipv6_broadcast(&net);
-        let expected = "fe::1f".parse::<Ipv6Addr>().unwrap();
-        assert_eq!(result, expected);
-    }
-
-    fn ipv6_broadcast_large() {
-        let net = "ffa::/19".parse::<Ipv6Network>().unwrap();
-        let result = ipv6_broadcast(&net);
-        let expected = "ff:bf:ff:ff:ff:ff:ff:ff".parse::<Ipv6Addr>().unwrap();
         assert_eq!(result, expected);
     }
 }
