@@ -10,6 +10,7 @@ log = "0.3.8"
 ipnetwork = "0.12.6"
 iprange = "0.4.1"
 ipnet = "1.0.0"
+range-map = "0.1.5"
 
 [workspace]
 members = ["opslib"]

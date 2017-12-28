@@ -16,7 +16,6 @@ fn parse_single_ip(txt: &str) -> Result<IpAddr, String>{
 }
 
 pub fn parse_ip(txt: &str) -> Result<IpRangeUniversal, String> {
-    //TODO: enable
     if let Some(idx) = txt.find("-") {
     //range
         let begin = &txt[0..idx];

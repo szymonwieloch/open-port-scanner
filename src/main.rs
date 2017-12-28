@@ -5,6 +5,7 @@ extern crate log;
 extern crate ipnetwork;
 extern crate iprange;
 extern crate ipnet;
+extern crate range_map;
 mod cfg;
 
 use cfg::parse_args;

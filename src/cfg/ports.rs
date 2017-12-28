@@ -1,4 +1,4 @@
-use opslib::utils::{Range, simplify};
+use range_map::{Range, RangeSet};
 
 ///Parses only single port value.
 fn parse_port(port: &str) -> Result<u16, String> {
@@ -10,30 +10,30 @@ fn parse_port(port: &str) -> Result<u16, String> {
 
 ///Parses set of ports in nmap-compabile format.
 ///Returns human-friendly message on error for use in parsing command line arguments.
-pub fn parse_ports(txt: &str) -> Result<Vec<Range<u16>>, String> {
-    let mut result:Vec<Range<u16>> = Vec::new();
+pub fn parse_ports(txt: &str) -> Result<RangeSet<u16>, String> {
     if txt.is_empty() {
-        return Ok(result);
+        return Ok(RangeSet::new())
     }
-    for range in txt.split(","){
-        match range.find("-"){
-            Some(idx) => {
-                let start = &range[0..idx];
-                let end = &range[idx+1..];
-                let start = parse_port(start)?;
-                let end = parse_port(end)?;
-                if start > end {
-                    return Err(format!("{} is greater than {}", start, end));
-                }
-                result.push(Range::new(start, end))
-            },
-            None => {
-                let val = parse_port(range)?;
-                result.push(Range::new(val, val));
+    txt.split(",").map(parse_range).collect()
+}
+
+fn parse_range(txt: &str) -> Result<Range<u16>, String> {
+    match txt.find("-"){
+        Some(idx) => {
+            let start = &txt[0..idx];
+            let end = &txt[idx+1..];
+            let start = parse_port(start)?;
+            let end = parse_port(end)?;
+            if start > end {
+                return Err(format!("{} is greater than {}", start, end));
             }
+            Ok(Range::new(start, end))
+        },
+        None => {
+            let val = parse_port(txt)?;
+            Ok(Range::single(val))
         }
     }
-    Ok(simplify(result))
 }
 
 pub fn validate_ports(port: String) -> Result<(), String> {
@@ -46,38 +46,40 @@ pub fn validate_ports(port: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::iter::FromIterator;
+
     #[test]
     fn parse_empty(){
         let result = parse_ports("");
-        let expected = Ok(Vec::new());
+        let expected = Ok(RangeSet::new());
         assert_eq!(result, expected);
     }
 
     #[test]
     fn parse_single_port(){
         let result = parse_ports("5");
-        let expected = Ok(vec![Range::new(5, 5)]);
+        let expected = Ok(RangeSet::single(5));
         assert_eq!(result, expected);
     }
 
     #[test]
     fn parse_single_range(){
         let result = parse_ports("5-8");
-        let expected = Ok(vec![Range::new(5, 8)]);
+        let expected = Ok(RangeSet::from_iter(vec![Range::new(5, 8)]));
         assert_eq!(result, expected);
     }
 
     #[test]
     fn parse_multiple(){
         let result = parse_ports("5-8,2,45-80");
-        let expected = Ok(vec![Range::new(2, 2), Range::new(5, 8), Range::new(45, 80)]);
+        let expected = Ok(RangeSet::from_iter(vec![Range::new(2, 2), Range::new(5, 8), Range::new(45, 80)]));
         assert_eq!(result, expected);
     }
 
     #[test]
     fn parse_multiple_and_merge(){
         let result = parse_ports("5-10,9-18,7");
-        let expected = Ok(vec![Range::new(5, 18)]);
+        let expected = Ok(RangeSet::from_iter(vec![Range::new(5, 18)]));
         assert_eq!(result, expected);
     }
 

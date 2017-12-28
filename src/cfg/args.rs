@@ -1,14 +1,14 @@
 use clap::{Arg, App};
-use opslib::utils::{Range};
 use super::ports::{parse_ports, validate_ports};
 use super::ips::{parse_ip, validate_ip, IpRangeUniversal};
 use iprange::IpRange;
 use ipnet::{Ipv4Net, Ipv6Net};
+use range_map::RangeSet;
 
 #[derive(Debug)]
 pub struct OpsConfig {
-    tcp_ports: Vec<Range<u16>>,
-    udp_ports: Vec<Range<u16>>,
+    tcp_ports: RangeSet<u16>,
+    udp_ports: RangeSet<u16>,
     ipv4: IpRange<Ipv4Net>,
     ipv6: IpRange<Ipv6Net>,
     ping: bool,
